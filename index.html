@@ -1,0 +1,712 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="2026 한국폴리텍 서울정수캠퍼스 시각디자인과 졸업전시 BEYOND THE FRAME — 인터랙티브 3D 웹 포스터">
+<title>Beyond the Frame</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+KR:wght@300;400;500&family=Poiret+One&display=swap">
+<style>
+/* Layout: one full-bleed WebGL gallery; the poster's own typography is spread to the four screen edges like the printed sheet. */
+:root {
+  --paper: #eee5d8;      /* gallery wall / poster paper */
+  --ink: #5b4330;        /* poster brown */
+  --ink-soft: #8a7258;
+  --glow: #fff3dc;       /* light through the cracks */
+  --shade: rgba(60, 40, 22, .55);
+  --display: "Poiret One", "Didot", serif;
+  --body: "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --edge: max(16px, env(safe-area-inset-left, 0px));
+  --edge-r: max(16px, env(safe-area-inset-right, 0px));
+  color-scheme: light;
+}
+html, body { height: 100%; }
+body { background: var(--paper); color: var(--ink); font-family: var(--body); overflow: hidden; overscroll-behavior: none;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+#stage { position: fixed; inset: 0; transform: translateZ(0); overflow: hidden; background: var(--paper); } /* fixed children are laid out inside the stage */
+html.letterbox body { background: #17110b; }
+html.letterbox #stage { inset: auto; top: 50%; left: 50%; height: min(100vh, 177.78vw); width: calc(min(100vh, 177.78vw) * .5625); translate: -50% -50%; }
+#c { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; cursor: grab; -webkit-user-select: none; user-select: none; }
+#c.dragging { cursor: grabbing; }
+#c.over { cursor: pointer; }
+.grain { position: fixed; inset: 0; z-index: 2; pointer-events: none; mix-blend-mode: multiply; opacity: .16;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 .35  0 0 0 0 .26  0 0 0 0 .18  0 0 0 1.1 -.25'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>"); }
+.vignette { position: fixed; inset: 0; z-index: 1; pointer-events: none; background: radial-gradient(120% 90% at 50% 45%, transparent 55%, rgba(70, 48, 26, .28) 100%); }
+
+.ui { position: fixed; z-index: 3; pointer-events: none; color: var(--ink); text-shadow: 0 0 18px rgba(238, 229, 216, .9); }
+.ui * { pointer-events: auto; }
+.tl { top: calc(env(safe-area-inset-top, 0px) + 22px); left: var(--edge); max-width: 46vw; }
+.tr { top: calc(env(safe-area-inset-top, 0px) + 22px); right: var(--edge-r); text-align: right; }
+.rm { right: var(--edge-r); top: calc(env(safe-area-inset-top, 0px) + 90px); text-align: right; }
+.bl { bottom: calc(env(safe-area-inset-bottom, 0px) + 22px); left: var(--edge); }
+.br { bottom: calc(env(safe-area-inset-bottom, 0px) + 22px); left: 50%; transform: translateX(-50%); text-align: center; }
+.school { font-weight: 500; font-size: 15px; line-height: 1.45; letter-spacing: -.01em; margin: 0; }
+.names { margin: 14px 0 0; padding: 0; list-style: none; font-size: 12px; line-height: 1.62; font-weight: 300; color: var(--ink-soft); letter-spacing: .01em; }
+.names-toggle { display: none; margin-top: 10px; font: 500 11px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--ink);
+  background: rgba(238, 229, 216, .7); border: 1px solid rgba(91, 67, 48, .35); border-radius: 999px; padding: 7px 11px; cursor: pointer; }
+.names-toggle:focus-visible, .sound:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+.tagline { font-weight: 500; font-size: 15px; line-height: 1.45; margin: 0; }
+.edition { font-family: var(--body); font-weight: 400; font-size: 12px; line-height: 1.55; letter-spacing: .16em; margin: 22px 0 0; color: var(--ink); }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+.venue { font-size: 14px; line-height: 1.55; font-weight: 400; margin: 0; }
+.venue b { display: block; font-family: var(--display); font-weight: 400; font-size: 44px; line-height: 1; letter-spacing: -.01em; margin-bottom: 8px; color: var(--ink); }
+.hint { font: 400 11px/1.5 var(--mono); letter-spacing: .04em; color: var(--ink-soft); margin: 0; max-width: 360px; }
+.hint span { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: #f6c77f; box-shadow: 0 0 10px 3px rgba(255, 214, 150, .9); margin-right: 7px; vertical-align: 1px; animation: pulse 1.8s ease-in-out infinite; }
+@keyframes pulse { 50% { opacity: .35; transform: scale(.7); } }
+
+#loading { position: fixed; inset: 0; z-index: 5; display: grid; place-items: center; background: var(--paper); transition: opacity .9s ease; }
+#loading.done { opacity: 0; pointer-events: none; }
+#loading p { font: 400 12px/1.6 var(--mono); letter-spacing: .12em; color: var(--ink-soft); text-transform: uppercase; text-align: center; margin: 0; }
+#loading .bar { width: 160px; height: 1px; background: rgba(91, 67, 48, .2); margin: 14px auto 0; overflow: hidden; }
+#loading .bar i { display: block; height: 100%; width: 0; background: var(--ink); transition: width .3s ease; }
+#err { position: fixed; inset: auto var(--edge-r) 90px var(--edge); z-index: 6; font: 13px/1.5 var(--body); color: var(--ink); }
+
+@media (max-width: 760px) {
+  .tl { max-width: 62vw; }
+  .school, .tagline { font-size: 13px; }
+  .names { display: none; columns: 2; column-gap: 14px; font-size: 11px; background: rgba(238, 229, 216, .82); padding: 10px 12px; border-radius: 6px; }
+  .names.open { display: block; }
+  .names-toggle { display: inline-block; }
+  .edition { font-size: 10px; letter-spacing: .12em; margin-top: 12px; }
+  .venue { font-size: 11.5px; }
+  .venue b { font-size: 32px; }
+  .br { display: none; }
+  .hint-m { display: block !important; }
+}
+.hint-m { display: none; position: fixed; z-index: 3; right: var(--edge-r); bottom: calc(env(safe-area-inset-bottom, 0px) + 26px); white-space: nowrap; }
+@media (prefers-reduced-motion: reduce) { .hint span { animation: none; } }
+/* Portrait screens (the 1080 × 1920 kiosk, phones) follow the printed poster's grid:
+   school + names top-left, tagline top-right, edition right-middle, date + venue bottom-left, logotype bottom-right (3D).
+   Sizes are kiosk pixels × --k (screen width / 1080), never smaller than legible on a phone. */
+html.tall .tl { top: 4.4%; left: 6.2%; max-width: 46%; } html.tall .tr { top: 4.4%; right: 6.2%; }
+html.tall .rm { top: 57%; right: 6.2%; transform: none; }
+html.tall .bl { bottom: 4%; left: 6.2%; }
+html.tall .school, html.tall .tagline { font-size: max(11px, calc(26px * var(--k))); line-height: 1.5; letter-spacing: -.01em; }
+html.tall .names { display: block; columns: 1; font-size: max(8.5px, calc(16.5px * var(--k))); line-height: 1.68; margin-top: calc(26px * var(--k)); background: none; padding: 0; }
+html.tall .names-toggle { display: none; }
+html.tall .edition { font-size: max(9.5px, calc(20px * var(--k))); line-height: 1.9; letter-spacing: .02em; margin: 0; }
+html.tall .venue { font-size: max(11px, calc(26px * var(--k))); line-height: 1.5; }
+html.tall .br { display: none; }
+html.tall .hint-m { display: block !important; left: auto; transform: none; top: 72%; bottom: auto; right: 6.2%; font-size: max(10px, calc(16px * var(--k))); }
+html.tall .hint-m span { width: max(6px, calc(10px * var(--k))); height: max(6px, calc(10px * var(--k))); }
+html, body { -webkit-touch-callout: none; }
+</style>
+</head>
+<body>
+
+
+<div id="stage">
+<canvas id="c" aria-label="3D 전시장: 공중에 떠 있는 BEYOND THE FRAME 포스터. 포스터를 누르면 균열을 따라 코드가 퍼집니다."></canvas>
+<div class="vignette"></div>
+<div class="grain"></div>
+
+<header class="ui tl">
+  <p class="school">한국폴리텍 서울정수캠퍼스<br>시각디자인과 전시회</p>
+  <button class="names-toggle" id="namesBtn" type="button" aria-expanded="false" aria-controls="names">참여 작가 14</button>
+  <ul class="names" id="names">
+    <li>Cheon Seung-hyun</li><li>Song Ye-jun</li><li>Kim Jun-seo</li><li>Jo Ye-bin</li><li>Kim Su-yeon</li><li>Kim Ye-il</li><li>Kim Woo-seon</li>
+    <li>Min Ha-do</li><li>Park Jae-yeon</li><li>Park Su-bin</li><li>Park Ho-sung</li><li>Oh Su-hwan</li><li>Son Ye-jin</li><li>Ha Tae-rang</li>
+  </ul>
+</header>
+<div class="ui tr"><p class="tagline">프레임 너머<br>우리를 만나다</p></div>
+<div class="ui rm"><p class="edition">2026<br>GRADUATION<br>EXHIBITION<br>DIGIT<br>DIGITAL<br>DESIGN</p></div>
+<div class="ui bl"><p class="venue"><span class="sr">11월 17일부터 18일까지, </span>한국폴리텍 서울정수캠퍼스<br>제3공학관 2층 시각디자인과</p></div>
+<div class="ui br"><p class="hint"><span></span>포스터를 누르면 금 간 자리에서 코드가 흘러나와요. 빈 곳을 끌면 전시장을 둘러볼 수 있어요.</p></div>
+<p class="ui hint hint-m"><span></span>포스터를 눌러 보세요</p>
+
+</div>
+<div id="loading"><div><p>Beyond the Frame<br>전시장 여는 중</p><div class="bar"><i id="bar"></i></div></div></div>
+
+<script type="importmap">
+{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+               "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/" } }
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { Reflector } from 'three/addons/objects/Reflector.js';
+import { SVGLoader } from 'three/addons/loaders/SVGLoader.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+
+const $ = id => document.getElementById(id);
+// #kiosk previews the 1080 × 1920 portrait kiosk in any window
+const letterbox = /kiosk/.test(location.hash); if (letterbox) document.documentElement.classList.add('letterbox');
+const stage = $('stage'); const vw = () => stage.clientWidth || innerWidth, vh = () => stage.clientHeight || innerHeight;
+addEventListener('contextmenu', e => e.preventDefault());
+const bar = $('bar'); let loaded = 0; const step = n => { loaded += n; bar.style.width = Math.min(100, loaded) + '%'; };
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const small = matchMedia('(max-width: 760px)').matches;
+const kiosk = letterbox || (innerWidth >= 900 && innerHeight > innerWidth);
+const mobile = small && !kiosk;   // phones get the light settings; the kiosk gets the full ones
+{ const k = () => { const r = document.documentElement; r.style.setProperty('--k', (vw() / 1080).toFixed(4)); r.classList.toggle('tall', vw() / vh() < .9); }; k(); addEventListener('resize', k); }
+
+$('namesBtn').addEventListener('click', () => { const l = $('names'), o = l.classList.toggle('open'); $('namesBtn').setAttribute('aria-expanded', o); });
+
+/* ---------------- renderer / scene ---------------- */
+const canvas = $('c');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
+const DPR = kiosk ? Math.min(2, Math.max(devicePixelRatio || 1, 1.5)) : Math.min(devicePixelRatio || 1, mobile ? 1.75 : 2);
+renderer.setPixelRatio(DPR);
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = .85;
+renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+const scene = new THREE.Scene();
+const PAPER = new THREE.Color('#d8cab6');
+scene.background = PAPER.clone();
+scene.fog = new THREE.Fog(new THREE.Color('#d8cab6'), 10, 28);
+const pmrem = new THREE.PMREMGenerator(renderer);
+const env = pmrem.fromScene(new RoomEnvironment(), .04).texture;
+scene.environment = env; scene.environmentIntensity = .55;
+
+const camera = new THREE.PerspectiveCamera(38, 1, .05, 60);
+
+/* ---------------- room ---------------- */
+const ROOM = { w: 11, d: 18, h: 4.6, back: -3.6 };
+const wallMat = new THREE.MeshStandardMaterial({ color: '#cdbda7', roughness: .96, metalness: 0 });
+function plane(w, h, mat, pos, rot) { const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), mat); m.position.set(...pos); m.rotation.set(...rot); m.receiveShadow = true; scene.add(m); return m; }
+const zMid = ROOM.back + ROOM.d / 2;
+plane(ROOM.w, ROOM.h, wallMat, [0, ROOM.h / 2, ROOM.back], [0, 0, 0]);                         // back wall
+plane(ROOM.d, ROOM.h, wallMat, [-ROOM.w / 2, ROOM.h / 2, zMid], [0, Math.PI / 2, 0]);        // left
+plane(ROOM.d, ROOM.h, wallMat, [ROOM.w / 2, ROOM.h / 2, zMid], [0, -Math.PI / 2, 0]);        // right
+const ceilMat = new THREE.MeshStandardMaterial({ color: '#e6dccd', roughness: 1, emissive: '#e8dccb', emissiveIntensity: .35 });
+plane(ROOM.w, ROOM.d, ceilMat, [0, ROOM.h, zMid], [Math.PI / 2, 0, 0]);
+// skirting shadow line where wall meets floor (gallery detail)
+const skirt = new THREE.MeshBasicMaterial({ color: '#cbbba6' });
+plane(ROOM.w, .06, skirt, [0, .03, ROOM.back + .002], [0, 0, 0]);
+
+// polished concrete: a dimmed mirror under a translucent floor
+const mirror = new Reflector(new THREE.PlaneGeometry(ROOM.w, ROOM.d), { textureWidth: mobile ? 512 : kiosk ? 1536 : 1024, textureHeight: mobile ? 512 : kiosk ? 1536 : 1024, color: 0x9a8f80, clipBias: .003 });
+mirror.rotation.x = -Math.PI / 2; mirror.position.set(0, 0, zMid); scene.add(mirror);
+const floorTex = (() => { const c = document.createElement('canvas'); c.width = c.height = 512; const x = c.getContext('2d');
+  x.fillStyle = '#c9baa5'; x.fillRect(0, 0, 512, 512);
+  for (let i = 0; i < 9000; i++) { const g = 180 + Math.random() * 50 | 0; x.fillStyle = `rgba(${g},${g - 12},${g - 28},${Math.random() * .12})`; x.fillRect(Math.random() * 512, Math.random() * 512, 2, 2); }
+  x.strokeStyle = 'rgba(120,100,80,.18)'; x.lineWidth = 2; x.strokeRect(0, 0, 512, 512); // slab joints
+  const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(ROOM.w / 3, ROOM.d / 3); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; return t; })();
+const floor = plane(ROOM.w, ROOM.d, new THREE.MeshStandardMaterial({ map: floorTex, roughness: .5, metalness: 0, transparent: true, opacity: .8 }), [0, .002, zMid], [-Math.PI / 2, 0, 0]);
+
+// skylight grid in the ceiling
+const skyMat = new THREE.MeshBasicMaterial({ color: '#fff8ec' });
+const wellMat = new THREE.MeshStandardMaterial({ color: '#ddd2c2', roughness: 1, side: THREE.BackSide });
+const skylights = [];
+for (let r = 0; r < 4; r++) for (let c = -1; c <= 1; c++) {
+  const x = c * 3.2, z = ROOM.back + 1.6 + r * 3.6;
+  const p = new THREE.Mesh(new THREE.PlaneGeometry(1.9, 1.3), skyMat); p.rotation.x = Math.PI / 2; p.position.set(x, ROOM.h + .35, z); scene.add(p);
+  const well = new THREE.Mesh(new THREE.BoxGeometry(1.9, .35, 1.3), wellMat); well.position.set(x, ROOM.h + .175, z); scene.add(well);
+  skylights.push(new THREE.Vector3(x, ROOM.h, z));
+}
+
+// light: soft sky + one sun through the skylights + a gallery spot on the poster
+scene.add(new THREE.HemisphereLight('#fff3e2', '#b9a286', .8));
+const sun = new THREE.DirectionalLight('#ffe6c2', 1.9);
+sun.position.set(-3.5, 9, 3.2); sun.target.position.set(.4, 0, -.6); scene.add(sun, sun.target);
+sun.castShadow = true; sun.shadow.mapSize.setScalar(mobile ? 1024 : 2048); sun.shadow.radius = 6; sun.shadow.bias = -.0004; sun.shadow.normalBias = .02;
+Object.assign(sun.shadow.camera, { left: -5, right: 5, top: 5, bottom: -5, near: 1, far: 20 });
+const spot = new THREE.SpotLight('#fff1dc', 38, 14, .42, .7, 1.2); spot.position.set(.6, 4.3, 3.6); scene.add(spot, spot.target);
+
+/* light shafts from the skylights, slanted like the beams in the poster */
+const shaftMat = new THREE.ShaderMaterial({
+  transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
+  uniforms: { uT: { value: 0 }, uA: { value: .085 } },
+  vertexShader: `varying vec2 vUv; varying vec3 vW; void main(){ vUv=uv; vec4 w=modelMatrix*vec4(position,1.); vW=w.xyz; gl_Position=projectionMatrix*viewMatrix*w; }`,
+  fragmentShader: `varying vec2 vUv; varying vec3 vW; uniform float uT, uA;
+    float h(vec2 p){ return fract(sin(dot(p, vec2(41.3, 289.1)))*43758.5); }
+    float n(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.-2.*f); return mix(mix(h(i),h(i+vec2(1,0)),f.x), mix(h(i+vec2(0,1)),h(i+vec2(1,1)),f.x), f.y); }
+    void main(){ float side = smoothstep(0., .35, vUv.x) * smoothstep(1., .65, vUv.x);
+      float fall = smoothstep(0., .9, vUv.y) * (.35 + .65 * vUv.y);
+      float dust = .75 + .5 * n(vec2(vUv.x * 6., vUv.y * 3. - uT * .05));
+      gl_FragColor = vec4(vec3(1., .93, .8) * side * fall * dust * uA, 1.); }`,
+});
+for (const [x, z, w] of [[-3.2, -2.0, 1.7], [0, -2.0, 1.7], [-3.2, 1.6, 1.7], [3.2, 1.6, 1.2], [0, 5.2, 1.7]]) {
+  const g = new THREE.Group(); g.position.set(x, ROOM.h, z);
+  for (const ry of [0, Math.PI / 2]) { const m = new THREE.Mesh(new THREE.PlaneGeometry(w, 5.6), shaftMat); m.position.y = -2.8; m.rotation.y = ry; g.add(m); }
+  g.rotation.z = -.36; g.rotation.x = .12; scene.add(g);
+}
+
+/* warm light leaks drifting over the walls (the poster's background, carried into the room) */
+function leakTexture() {
+  const c = document.createElement('canvas'); c.width = 1024; c.height = 512; const x = c.getContext('2d');
+  for (let i = 0; i < 14; i++) {
+    const cx = Math.random() * 1024, w = 30 + Math.random() * 120, a = .12 + Math.random() * .35;
+    const g = x.createLinearGradient(cx - w, 0, cx + w, 0); g.addColorStop(0, 'rgba(255,240,215,0)'); g.addColorStop(.5, `rgba(255,244,226,${a})`); g.addColorStop(1, 'rgba(255,240,215,0)');
+    x.save(); x.translate(cx, 256); x.rotate(-.5 + Math.random() * .25); x.translate(-cx, -256); x.fillStyle = g; x.fillRect(cx - w, -300, w * 2, 1100); x.restore();
+  }
+  for (let i = 0; i < 6; i++) { const cx = Math.random() * 1024, cy = Math.random() * 512, r = 40 + Math.random() * 90; const g = x.createRadialGradient(cx, cy, 0, cx, cy, r); g.addColorStop(0, 'rgba(255,248,232,.55)'); g.addColorStop(1, 'rgba(255,248,232,0)'); x.fillStyle = g; x.fillRect(cx - r, cy - r, r * 2, r * 2); }
+  const t = new THREE.CanvasTexture(c); t.wrapS = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace; return t;
+}
+const leaks = [];
+for (const [w, h, pos, rot, rep] of [[ROOM.w, ROOM.h, [0, ROOM.h / 2, ROOM.back + .01], [0, 0, 0], 1], [ROOM.d, ROOM.h, [-ROOM.w / 2 + .01, ROOM.h / 2, zMid], [0, Math.PI / 2, 0], 1.6], [ROOM.d, ROOM.h, [ROOM.w / 2 - .01, ROOM.h / 2, zMid], [0, -Math.PI / 2, 0], 1.6]]) {
+  const t = leakTexture(); t.repeat.x = rep;
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ map: t, transparent: true, opacity: .45, blending: THREE.AdditiveBlending, depthWrite: false, fog: true }));
+  m.position.set(...pos); m.rotation.set(...rot); scene.add(m); leaks.push(t);
+}
+// pools of skylight on the floor
+{ const c = document.createElement('canvas'); c.width = c.height = 256; const x = c.getContext('2d'); const g = x.createRadialGradient(128, 128, 0, 128, 128, 128); g.addColorStop(0, 'rgba(255,246,228,.5)'); g.addColorStop(.6, 'rgba(255,246,228,.14)'); g.addColorStop(1, 'rgba(255,246,228,0)'); x.fillStyle = g; x.fillRect(0, 0, 256, 256);
+  const t = new THREE.CanvasTexture(c); const mat = new THREE.MeshBasicMaterial({ map: t, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false });
+  for (const s of skylights) { const m = new THREE.Mesh(new THREE.PlaneGeometry(3.4, 2.4), mat); m.rotation.x = -Math.PI / 2; m.position.set(s.x + 1.55, .006, s.z - .25); scene.add(m); } }
+
+// dust in the light
+const dust = (() => { const N = mobile ? 260 : 520, p = new Float32Array(N * 3), s = new Float32Array(N);
+  for (let i = 0; i < N; i++) { p[i * 3] = (Math.random() - .5) * 8; p[i * 3 + 1] = Math.random() * 4.2; p[i * 3 + 2] = ROOM.back + Math.random() * 9; s[i] = Math.random(); }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(p, 3)); g.setAttribute('seed', new THREE.BufferAttribute(s, 1));
+  const m = new THREE.ShaderMaterial({ transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, uniforms: { uT: { value: 0 }, uPx: { value: DPR } },
+    vertexShader: `attribute float seed; uniform float uT, uPx; varying float vA;
+      void main(){ vec3 p=position; p.y=mod(p.y + uT*(.02+.03*seed), 4.2); p.x += sin(uT*.2+seed*30.)*.15; vec4 mv=modelViewMatrix*vec4(p,1.);
+        gl_PointSize = (1.2+2.2*seed) * uPx * (3.2 / -mv.z); vA = .35 + .65*fract(seed*7.3); gl_Position=projectionMatrix*mv; }`,
+    fragmentShader: `varying float vA; void main(){ float d=length(gl_PointCoord-.5); gl_FragColor=vec4(vec3(1.,.95,.85), smoothstep(.5,.0,d)*vA*.55); }` });
+  const pts = new THREE.Points(g, m); scene.add(pts); return m; })();
+
+// two empty frames on the side walls — the "frame" the exhibition steps out of
+const frameMat = new THREE.MeshStandardMaterial({ color: '#7a5a3c', roughness: .45, metalness: .35 });
+function emptyFrame(w, h, t) { const g = []; for (const [sx, sy, px, py] of [[w, t, 0, h / 2 - t / 2], [w, t, 0, -h / 2 + t / 2], [t, h, -w / 2 + t / 2, 0], [t, h, w / 2 - t / 2, 0]]) { const b = new THREE.BoxGeometry(sx, sy, .05); b.translate(px, py, 0); g.push(b); } const m = new THREE.Mesh(mergeGeometries(g), frameMat); m.castShadow = true; return m; }
+for (const [x, z, ry, w, h] of [[-ROOM.w / 2 + .04, -1.2, Math.PI / 2, 1.1, 1.5], [-ROOM.w / 2 + .04, 1.6, Math.PI / 2, .8, 1.05], [ROOM.w / 2 - .04, .2, -Math.PI / 2, 1.3, 1.7]]) {
+  const f = emptyFrame(w, h, .045); f.position.set(x, 1.75, z); f.rotation.y = ry; scene.add(f);
+}
+
+/* ---------------- poster ---------------- */
+const PW = 1.2, PH = PW * 8000 / 5342;
+const poster = new THREE.Group(); scene.add(poster);
+const tilt = new THREE.Group(); poster.add(tilt);
+const glowTex = (() => { const c = document.createElement('canvas'); c.width = c.height = 128; const x = c.getContext('2d'); const g = x.createRadialGradient(64, 64, 0, 64, 64, 64); g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(.25, 'rgba(255,240,210,.55)'); g.addColorStop(1, 'rgba(255,230,190,0)'); x.fillStyle = g; x.fillRect(0, 0, 128, 128); return new THREE.CanvasTexture(c); })();
+
+/* ---------------- crack network + code streams ---------------- */
+const CODE = [
+  "document.querySelector('#frame')", "const beyond = frame.break();", "for (let i = 0; i < 14; i++) meet(us[i]);",
+  "if (!frame) return us;", "requestAnimationFrame(beyond);", "frame.style.border = 'none';", "new Exhibition('2026.11.17');",
+  "await look(beyond.the.frame);", "wings.forEach(w => w.open());", "light.pass(through.glass);", "while (crack) code.flow();",
+  "export default 'BEYOND THE FRAME';", "const us = [...designers];", "frame.remove(); // 11.18",
+];
+let crack = null;     // { pts geometry, arrival attr, graph }
+const streams = [];   // active code streams
+let burstT = -10, burstUV = new THREE.Vector2(.47, .44);
+
+function buildGlyphAtlas() {
+  const S = 64, cols = 16, c = document.createElement('canvas'); c.width = c.height = S * cols; const x = c.getContext('2d');
+  x.font = `500 ${S * .62}px "IBM Plex Mono", ui-monospace, monospace`; x.textAlign = 'center'; x.textBaseline = 'middle';
+  for (let i = 0; i < 95; i++) { const ch = String.fromCharCode(32 + i), cx = (i % cols) * S + S / 2, cy = Math.floor(i / cols) * S + S / 2;
+    // three layers in one atlas: a faint drop shadow (rgb 0), a coloured glow (green), a white-hot core (red)
+    x.shadowColor = 'rgba(0,0,0,.55)'; x.shadowBlur = S * .12; x.shadowOffsetX = S * .03; x.shadowOffsetY = S * .05; x.fillStyle = 'rgba(0,0,0,.35)'; x.fillText(ch, cx, cy);
+    x.shadowOffsetX = x.shadowOffsetY = 0; x.shadowColor = 'rgba(0,255,0,1)'; x.shadowBlur = S * .2; x.fillStyle = 'rgb(0,255,0)'; x.fillText(ch, cx, cy); x.fillText(ch, cx, cy);
+    x.shadowBlur = 0; x.fillStyle = 'rgb(255,255,255)'; x.fillText(ch, cx, cy); }
+  const t = new THREE.CanvasTexture(c); t.generateMipmaps = true; t.minFilter = THREE.LinearMipmapLinearFilter; return t;
+}
+
+const MAXG = 900;
+const glyphGeo = new THREE.InstancedBufferGeometry(); glyphGeo.copy(new THREE.PlaneGeometry(1, 1)); glyphGeo.instanceCount = 0;
+const gPos = new Float32Array(MAXG * 4), gInfo = new Float32Array(MAXG * 4); // pos.xyz + scale ; glyph, rot, alpha, tint
+glyphGeo.setAttribute('iPos', new THREE.InstancedBufferAttribute(gPos, 4).setUsage(THREE.DynamicDrawUsage));
+glyphGeo.setAttribute('iInfo', new THREE.InstancedBufferAttribute(gInfo, 4).setUsage(THREE.DynamicDrawUsage));
+const glyphMat = new THREE.ShaderMaterial({
+  transparent: true, depthWrite: false, toneMapped: false,
+  uniforms: { uAtlas: { value: null } },
+  vertexShader: `attribute vec4 iPos; attribute vec4 iInfo; varying vec2 vUv; varying float vA; varying float vTint;
+    void main(){ float g=iInfo.x, r=iInfo.y; vec2 p=position.xy; p=vec2(p.x*cos(r)-p.y*sin(r), p.x*sin(r)+p.y*cos(r))*iPos.w;
+      vec2 cell=vec2(mod(g,16.), floor(g/16.)); vUv=(cell+vec2(uv.x, 1.-uv.y))/16.; vUv.y=1.-vUv.y; vA=iInfo.z; vTint=iInfo.w;
+      gl_Position=projectionMatrix*modelViewMatrix*vec4(iPos.xyz+vec3(p,0.),1.); }`,
+  fragmentShader: `uniform sampler2D uAtlas; varying vec2 vUv; varying float vA; varying float vTint;
+    vec3 tint(float k){ return k<.5 ? vec3(1.,.78,.3) : k<1.5 ? vec3(1.,.55,.42) : k<2.5 ? vec3(.3,.82,1.) : k<3.5 ? vec3(.68,.5,1.) : vec3(.45,1.,.8); }
+    void main(){ vec4 t=texture2D(uAtlas, vUv); float a=t.a*vA; if(a<.01) discard;
+      float core=smoothstep(.25,.85,t.r), glow=clamp(t.g*1.6,0.,1.);
+      vec3 c = mix(vec3(.36,.22,.1), mix(tint(vTint)*1.25, vec3(1.,.99,.96), core), glow); gl_FragColor=vec4(c, a * mix(.55, 1., glow)); }`,
+});
+const glyphs = new THREE.Mesh(glyphGeo, glyphMat); glyphs.frustumCulled = false; glyphs.renderOrder = 5; tilt.add(glyphs);
+
+// crack points glow as the wave passes
+const crackMat = new THREE.ShaderMaterial({
+  transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+  uniforms: { uT: { value: 99 }, uPx: { value: DPR }, uHover: { value: new THREE.Vector3(9, 9, 0) }, uIdle: { value: 0 } },
+  vertexShader: `attribute float aT; attribute float aR; uniform float uT, uPx, uIdle; uniform vec3 uHover; varying float vA; varying float vR;
+    void main(){ float d=uT-aT; float wave=exp(-d*d*38.); float after= d>0. ? exp(-d*.9)*.55 : 0.;
+      float hov = uHover.z * smoothstep(.09, .0, distance(uv, uHover.xy));
+      float twinkle = uIdle * (.06 + .1*max(0., sin(aR*90. + uT*1.7)));
+      vA = clamp(wave*.85 + after*.55 + hov*.6 + twinkle, 0., 1.2); vR = aR;
+      vec4 mv=modelViewMatrix*vec4(position,1.); gl_PointSize = (1.6 + 5.5*wave + 2.*hov) * uPx * (2.6 / -mv.z); gl_Position=projectionMatrix*mv; }`,
+  fragmentShader: `varying float vA; varying float vR; void main(){ float d=length(gl_PointCoord-.5); float a=smoothstep(.5,.0,d)*vA; if(a<.004) discard;
+    vec3 prism = .5 + .5*cos(6.28*(vR + vec3(0., .33, .67)));           // light split by the broken edge
+    gl_FragColor=vec4(mix(vec3(1.), prism, .45)*a, a); }`,
+});
+
+function buildCracks(data) {
+  const raw = Uint8Array.from(atob(data.xy), c => c.charCodeAt(0)), xy = new Uint16Array(raw.buffer);
+  const n = data.n, W = data.w, H = data.h, grid = new Int32Array(W * H).fill(-1);
+  const pos = new Float32Array(n * 3), uvs = new Float32Array(n * 2), aT = new Float32Array(n).fill(1e4), aR = new Float32Array(n);
+  for (let i = 0; i < n; i++) { const x = xy[i * 2], y = xy[i * 2 + 1]; grid[y * W + x] = i; const u = x / W, v = y / H;
+    pos[i * 3] = (u - .5) * PW; pos[i * 3 + 1] = (.5 - v) * PH; pos[i * 3 + 2] = .016; uvs[i * 2] = u; uvs[i * 2 + 1] = v; aR[i] = Math.random(); }
+  const nb = new Int32Array(n * 8).fill(-1), deg = new Uint8Array(n);
+  for (let i = 0; i < n; i++) { const x = xy[i * 2], y = xy[i * 2 + 1]; let k = 0;
+    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { if (!dx && !dy) continue; const xx = x + dx, yy = y + dy; if (xx < 0 || yy < 0 || xx >= W || yy >= H) continue; const j = grid[yy * W + xx]; if (j >= 0) nb[i * 8 + k++] = j; }
+    deg[i] = k; }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
+  const at = new THREE.BufferAttribute(aT, 1); g.setAttribute('aT', at); g.setAttribute('aR', new THREE.BufferAttribute(aR, 1));
+  const pts = new THREE.Points(g, crackMat); pts.renderOrder = 4; tilt.add(pts);
+  crack = { n, W, H, xy, nb, deg, at, aT, dist: new Float32Array(n), parent: new Int32Array(n) };
+}
+
+// Dijkstra from the touch point: through the air slowly, along cracks fast
+function propagate(u, v) {
+  const C = crack, { n, W, H, xy, nb } = C, tx = u * W, ty = v * H, AIR = 2.4, dist = C.dist, par = C.parent;
+  const heap = [], push = (d, i) => { heap.push([d, i]); let k = heap.length - 1; while (k) { const p = (k - 1) >> 1; if (heap[p][0] <= heap[k][0]) break; [heap[p], heap[k]] = [heap[k], heap[p]]; k = p; } };
+  const pop = () => { const top = heap[0], last = heap.pop(); if (heap.length) { heap[0] = last; let k = 0; for (;;) { const l = k * 2 + 1, r = l + 1; let m = k; if (l < heap.length && heap[l][0] < heap[m][0]) m = l; if (r < heap.length && heap[r][0] < heap[m][0]) m = r; if (m === k) break; [heap[m], heap[k]] = [heap[k], heap[m]]; k = m; } } return top; };
+  for (let i = 0; i < n; i++) { const d = Math.hypot(xy[i * 2] - tx, xy[i * 2 + 1] - ty) * AIR; dist[i] = d; par[i] = -1; push(d, i); }
+  while (heap.length) { const [d, i] = pop(); if (d > dist[i]) continue;
+    for (let k = 0; k < 8; k++) { const j = nb[i * 8 + k]; if (j < 0) break; const nd = d + Math.hypot(xy[j * 2] - xy[i * 2], xy[j * 2 + 1] - xy[i * 2 + 1]); if (nd < dist[j]) { dist[j] = nd; par[j] = i; push(nd, j); } } }
+  const SPEED = 820; // px of the 1200-px map per second
+  for (let i = 0; i < n; i++) C.aT[i] = dist[i] / SPEED; C.at.needsUpdate = true;
+  return { tx, ty, SPEED };
+}
+
+const toLocal = (px, py) => new THREE.Vector2((px / crack.W - .5) * PW, (.5 - py / crack.H) * PH);
+function launchStreams(u, v) {
+  const C = crack, { tx, ty, SPEED } = propagate(u, v), { n, xy, deg, dist, parent } = C;
+  // pick crack ends spread around the touch point, farthest first
+  const ends = []; for (let i = 0; i < n; i++) if (deg[i] <= 1 && dist[i] < 2600) ends.push(i);
+  ends.sort((a, b) => dist[b] - dist[a]);
+  const bins = new Map(), want = mobile ? 9 : 13;
+  for (const i of ends) { const a = Math.atan2(xy[i * 2 + 1] - ty, xy[i * 2] - tx), b = Math.floor((a + Math.PI) / (2 * Math.PI) * want);
+    if (bins.has(b)) continue; let len = 0, j = i; while (parent[j] >= 0) { j = parent[j]; len++; } if (len < 40) continue; bins.set(b, i); }
+  const now = clock.elapsedTime; streams.length = Math.min(streams.length, 50);
+  let s = 0;
+  for (const end of bins.values()) {
+    const chain = []; let j = end; while (j >= 0) { chain.push(j); j = parent[j]; } chain.reverse();
+    const pts = [toLocal(tx, ty)]; for (let k = 0; k < chain.length; k += 6) pts.push(toLocal(xy[chain[k] * 2], xy[chain[k] * 2 + 1])); pts.push(toLocal(xy[end * 2], xy[end * 2 + 1]));
+    const cum = [0]; for (let k = 1; k < pts.length; k++) cum.push(cum[k - 1] + pts[k].distanceTo(pts[k - 1]));
+    const L = cum[cum.length - 1]; if (L < .05) continue;
+    const dir = pts[pts.length - 1].clone().sub(pts[Math.max(0, pts.length - 4)]).normalize();
+    const leftward = pts[pts.length - 1].x < pts[0].x;
+    // the first character leads the stream, so a stream read left-to-right is laid out back to front
+    let text = CODE[(Math.random() * CODE.length) | 0]; if (!leftward) text = [...text].reverse().join('');
+    const start = now + dist[chain[0]] / SPEED; // leave when the wave reaches this crack
+    streams.push({ tint: (Math.random() * 5) | 0, pts, cum, L, dir, leftward, text, t0: start, v: .5 + Math.random() * .18, size: (kiosk ? .062 : .05) + Math.random() * .012, seed: Math.random() * 6.28, lift: .7 + Math.random() * .8, drift: (Math.random() - .5) * .6 });
+    s++;
+  }
+  while (streams.length > 64) streams.shift();
+}
+
+function samplePath(st, s, out) {
+  const { pts, cum } = st; let k = 1; while (k < cum.length - 1 && cum[k] < s) k++;
+  const a = pts[k - 1], b = pts[k], t = (s - cum[k - 1]) / Math.max(1e-5, cum[k] - cum[k - 1]);
+  out.set(a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t); return Math.atan2(b.y - a.y, b.x - a.x);
+}
+const tmp = new THREE.Vector2();
+function updateGlyphs(now) {
+  let c = 0;
+  for (let si = streams.length - 1; si >= 0; si--) {
+    const st = streams[si], gap = st.size * .62, dt = gap / st.v; let alive = false;
+    for (let k = 0; k < st.text.length && c < MAXG; k++) {
+      const code = st.text.charCodeAt(k) - 32; if (code <= 0 || code > 94) continue;
+      const s = (now - st.t0 - k * dt) * st.v; if (s < 0) { alive = true; continue; }
+      let x, y, z = .02, rot, a = 1, sc = st.size;
+      if (s <= st.L) { rot = samplePath(st, s, tmp); x = tmp.x; y = tmp.y; a = Math.min(1, s / .04); }
+      else { // off the end of the crack: keep going and lift off the poster into the room
+        const e = s - st.L; x = st.pts[st.pts.length - 1].x + st.dir.x * e; y = st.pts[st.pts.length - 1].y + st.dir.y * e + e * e * .12;
+        z = .02 + e * e * st.lift + e * .25; rot = Math.atan2(st.dir.y, st.dir.x) + e * st.drift * 2.2; a = Math.max(0, 1 - e / 1.5); sc *= 1 + e * .8; }
+      if (st.leftward) rot += Math.PI;
+      if (a <= .003) continue; alive = true;
+      gPos[c * 4] = x; gPos[c * 4 + 1] = y; gPos[c * 4 + 2] = z; gPos[c * 4 + 3] = sc;
+      gInfo[c * 4] = code; gInfo[c * 4 + 1] = rot; gInfo[c * 4 + 2] = a; gInfo[c * 4 + 3] = st.tint; c++;
+    }
+    if (!alive) streams.splice(si, 1);
+  }
+  glyphGeo.instanceCount = c; glyphGeo.attributes.iPos.needsUpdate = true; glyphGeo.attributes.iInfo.needsUpdate = true;
+}
+
+// impact flash
+const flash = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color: '#fff2da', transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, opacity: 0 }));
+flash.renderOrder = 6; tilt.add(flash);
+
+/* ---------------- the glass in front of the print: nearly invisible cracks that catch the light ---------------- */
+const GW = 1024, GH = Math.round(GW * PH / PW);
+const baseCv = document.createElement('canvas'), freshCv = document.createElement('canvas');
+baseCv.width = freshCv.width = GW; baseCv.height = freshCv.height = GH;
+const baseTex = new THREE.CanvasTexture(baseCv), freshTex = new THREE.CanvasTexture(freshCv);
+for (const t of [baseTex, freshTex]) { t.premultiplyAlpha = false; t.generateMipmaps = true; t.minFilter = THREE.LinearMipmapLinearFilter; t.anisotropy = 8; }
+// a spider-web fracture: jagged radial cracks plus broken rings between them. Red = crack, green = a facet angle for glints.
+function drawWeb(ctx, u, v, size, rays) {
+  const cx = u * GW, cy = v * GH, R = size * GW, arms = [];
+  ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  const stroke = (pts, w) => { ctx.strokeStyle = `rgb(255,${(Math.random() * 255) | 0},0)`; ctx.lineWidth = w; ctx.beginPath(); ctx.moveTo(...pts[0]); for (const p of pts.slice(1)) ctx.lineTo(...p); ctx.stroke(); };
+  for (let i = 0; i < rays; i++) {
+    let a = i / rays * Math.PI * 2 + (Math.random() - .5) * .5, r = 0; const len = R * (.45 + Math.random() * .75), pts = [[cx, cy]];
+    while (r < len) { r += 6 + Math.random() * 14; a += (Math.random() - .5) * .22; pts.push([cx + Math.cos(a) * r, cy + Math.sin(a) * r]); }
+    stroke(pts, 1.1 + Math.random() * 1.4); arms.push(pts);
+    if (Math.random() < .55) { const k = 2 + (Math.random() * (pts.length - 3)) | 0, b = a + (Math.random() < .5 ? .6 : -.6); let q = pts[k], br = [q];
+      for (let j = 0; j < 5 + Math.random() * 7; j++) { q = [q[0] + Math.cos(b + (Math.random() - .5) * .4) * 9, q[1] + Math.sin(b + (Math.random() - .5) * .4) * 9]; br.push(q); } stroke(br, .9); }
+  }
+  for (const f of [.16, .32, .55]) { // rings: short jagged links between neighbouring arms
+    for (let i = 0; i < arms.length; i++) { if (Math.random() < .3) continue; const A = arms[i], B = arms[(i + 1) % arms.length];
+      const pa = A[Math.min(A.length - 1, Math.round(A.length * f))], pb = B[Math.min(B.length - 1, Math.round(B.length * f))]; if (!pa || !pb) continue;
+      const mid = [(pa[0] + pb[0]) / 2 + (Math.random() - .5) * 8, (pa[1] + pb[1]) / 2 + (Math.random() - .5) * 8]; stroke([pa, mid, pb], .8 + Math.random() * .6); } }
+  // a tiny crushed core
+  for (let i = 0; i < 18; i++) { const a = Math.random() * 6.28, r = Math.random() * R * .05; stroke([[cx, cy], [cx + Math.cos(a) * r, cy + Math.sin(a) * r]], .8); }
+}
+// the glass already carries a fracture where the poster's light bursts; it only shows when light rakes across it
+drawWeb(baseCv.getContext('2d'), .47, .44, .55, 13); drawWeb(baseCv.getContext('2d'), .73, .74, .16, 7); drawWeb(baseCv.getContext('2d'), .2, .2, .12, 6);
+let freshAt = new THREE.Vector2(.47, .44), freshT = -9;
+const glassMat = new THREE.ShaderMaterial({
+  transparent: true, depthWrite: false, toneMapped: false,
+  uniforms: { uBase: { value: baseTex }, uFresh: { value: freshTex }, uArt: { value: null }, uT: { value: 0 }, uFT: { value: 9 }, uAt: { value: freshAt }, uAng: { value: 0 }, uAsp: { value: PH / PW } },
+  vertexShader: `varying vec2 vUv; void main(){ vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.); }`,
+  fragmentShader: `uniform sampler2D uBase, uFresh, uArt; uniform float uT, uFT, uAng, uAsp; uniform vec2 uAt; varying vec2 vUv;
+    void main(){
+      vec2 tv = vec2(vUv.x, 1.-vUv.y);
+      vec4 b = texture2D(uBase, tv), f = texture2D(uFresh, tv);
+      float d = distance(vec2(tv.x, tv.y*uAsp), vec2(uAt.x, uAt.y*uAsp));
+      float grow = smoothstep(uFT*1.6, uFT*1.6 - .04, d);                 // new cracks shoot out from the touch
+      float fm = f.a * grow, m = max(b.a, fm);
+      if (m < .01) discard;
+      float facet = mix(b.g, f.g, step(b.a, fm));
+      // glints: each facet catches the light at its own angle, so cracks sparkle as the sheet sways or you look around
+      float glint = pow(.5 + .5*sin(facet*40. + uAng*16. + uT*.35), 10.);
+      float sweep = exp(-pow((tv.x + tv.y*.55) - (fract(uT*.06)*2.6 - .5), 2.) / .006);   // a slow band of light passing over
+      float fresh = fm * exp(-uFT*1.4) * 1.1;                // the new break catches the light, then stays clear
+      float hair = fm * .12 + b.a * .03;
+      // refraction: the print seen through a broken edge is nudged sideways
+      vec2 off = vec2(cos(facet*6.28), sin(facet*6.28)) * (.004 + fm*.004);
+      vec3 seen = vec3(texture2D(uArt, vUv + off).r, texture2D(uArt, vUv + off*1.5).g, texture2D(uArt, vUv + off*2.1).b); // dispersion
+      vec3 prism = .55 + .45*cos(6.28*(facet*3. + uT*.05 + vec3(0., .33, .67)));
+      vec3 light = prism * (glint*1.1 + sweep*1.2) + vec3(1.) * fresh;
+      float a = m * (.35 + glint*.6 + sweep*.7) + fresh*.6;
+      gl_FragColor = vec4(seen * (1. - hair) + light, clamp(a + fm*.35, 0., 1.));
+    }`,
+});
+function crackGlass(u, v) {
+  const bx = baseCv.getContext('2d');
+  bx.drawImage(freshCv, 0, 0); // yesterday's crack becomes part of the glass
+  const fx = freshCv.getContext('2d'); fx.clearRect(0, 0, GW, GH);
+  drawWeb(fx, u, v, .15 + Math.random() * .1, 8 + (Math.random() * 5) | 0);
+  baseTex.needsUpdate = true; freshTex.needsUpdate = true; freshAt.set(u, v); freshT = clock.elapsedTime;
+}
+
+// shards that flick off where the glass breaks
+const SH = 16, shardGeo = new THREE.BufferGeometry(); shardGeo.setAttribute('position', new THREE.Float32BufferAttribute([0, 1, 0, -.7, -.6, 0, .8, -.4, 0], 3)); shardGeo.computeVertexNormals();
+const shards = new THREE.InstancedMesh(shardGeo, new THREE.MeshBasicMaterial({ color: '#fff6e8', transparent: true, opacity: .55, side: THREE.DoubleSide, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false }), SH);
+shards.instanceMatrix.setUsage(THREE.DynamicDrawUsage); shards.renderOrder = 6; shards.frustumCulled = false;
+const shardState = Array.from({ length: SH }, () => ({ t: -9 })), dummy = new THREE.Object3D();
+function spawnShards(x, y) { const now = clock.elapsedTime; let n = 0;
+  for (const s of shardState) { if (now - s.t < 1.6 || n > 8) continue; n++; const a = Math.random() * 6.28, sp = .25 + Math.random() * .5;
+    Object.assign(s, { t: now, x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp + .2, vz: .6 + Math.random() * .7, r: Math.random() * 6, w: (Math.random() - .5) * 14, k: .008 + Math.random() * .018 }); } }
+function updateShards(now) {
+  shardState.forEach((s, i) => { const e = now - s.t;
+    if (e > 1.6) { dummy.scale.setScalar(0); }
+    else { dummy.position.set(s.x + s.vx * e, s.y + s.vy * e - 1.4 * e * e, .03 + s.vz * e); dummy.rotation.set(s.r + s.w * e, s.r * .7 + s.w * e * .6, s.r); dummy.scale.setScalar(s.k * (1 - e / 1.6)); }
+    dummy.updateMatrix(); shards.setMatrixAt(i, dummy.matrix); });
+  shards.instanceMatrix.needsUpdate = true;
+}
+
+// short bright tokens that escape straight out of the break
+const TOKENS = ['{ }', '</>', '=>', '0x1F', ';', '[ ]', 'frame', '()', '&&', '#', '01', '!=', 'us', '++'];
+function spray(u, v) {
+  const p = new THREE.Vector2((u - .5) * PW, (.5 - v) * PH), now = clock.elapsedTime;
+  for (let i = 0; i < (mobile ? 7 : 11); i++) { const a = Math.random() * 6.28, dir = new THREE.Vector2(Math.cos(a), Math.sin(a)), q = p.clone().addScaledVector(dir, .015);
+    const leftward = dir.x < 0; let text = TOKENS[(Math.random() * TOKENS.length) | 0]; if (!leftward) text = [...text].reverse().join('');
+    streams.push({ tint: (Math.random() * 5) | 0, pts: [p.clone(), q], cum: [0, .015], L: .015, dir, leftward, text, t0: now + Math.random() * .12, v: .35 + Math.random() * .35, size: (kiosk ? .05 : .04) + Math.random() * .02, seed: 0, lift: 1.2 + Math.random() * 1.6, drift: (Math.random() - .5) * 1.4 }); }
+}
+
+/* ---------------- butterflies: the poster's cracked butterfly, cut out and given wings ---------------- */
+const WING = { aspect: 607 / 995, hinge: .5969 };
+const flock = []; let wingMat = null, wingGeo = null;
+const BOUND = { x: 3.6, y0: .45, y1: 3.5, z0: -2.9, z1: 1.9 };
+function makeButterfly(pos, vel, scale) {
+  const g = new THREE.Group(), R = new THREE.Mesh(wingGeo, wingMat), L = new THREE.Mesh(wingGeo, wingMat); L.scale.x = -1;
+  R.castShadow = L.castShadow = true; g.add(R, L); g.scale.setScalar(scale); g.position.copy(pos); scene.add(g);
+  const b = { g, R, L, vel: vel.clone(), target: new THREE.Vector3(), nextT: 0, phase: Math.random() * 6.28, freq: 8.5 + Math.random() * 3.5, glide: 0, born: clock.elapsedTime, scale, fwd: new THREE.Vector3(0, 0, 1) };
+  flock.push(b); return b;
+}
+function newTarget(b, now) {
+  b.target.set((Math.random() * 2 - 1) * BOUND.x, BOUND.y0 + Math.random() * (BOUND.y1 - BOUND.y0), BOUND.z0 + Math.random() * (BOUND.z1 - BOUND.z0));
+  b.nextT = now + 3 + Math.random() * 4;
+}
+const _r = new THREE.Vector3(), _n = new THREE.Vector3(), _up = new THREE.Vector3(0, 1, 0), _m = new THREE.Matrix4(), _acc = new THREE.Vector3(), _q = new THREE.Quaternion();
+function updateFlock(now, dt) {
+  for (let i = flock.length - 1; i >= 0; i--) {
+    const b = flock[i], p = b.g.position;
+    if (now > b.nextT || p.distanceTo(b.target) < .35) newTarget(b, now);
+    // steer toward the target, keep clear of the poster's glass
+    _acc.subVectors(b.target, p).normalize().multiplyScalar(1.1).addScaledVector(b.vel, -.55);
+    const lp = poster.position; if (Math.abs(p.x - lp.x) < .8 && Math.abs(p.y - lp.y) < 1.05 && Math.abs(p.z - lp.z) < .35) _acc.z += (p.z >= lp.z ? 1 : -1) * 4;
+    b.vel.addScaledVector(_acc, dt); const sp = b.vel.length(); if (sp > .75) b.vel.multiplyScalar(.75 / sp); if (sp < .2) b.vel.multiplyScalar(.2 / Math.max(sp, 1e-4));
+    if (b.glide <= 0 && Math.random() < dt * .25) b.glide = .35 + Math.random() * .5; b.glide -= dt;
+    b.phase += dt * b.freq * (b.glide > 0 ? .25 : 1) * 6.283;
+    const s = .5 + .5 * Math.sin(b.phase), open = b.glide > 0 ? .2 + s * .1 : .12 + s * 1.15;
+    p.addScaledVector(b.vel, dt); p.y += (b.glide > 0 ? -.12 : Math.cos(b.phase) * .09) * dt * 4;
+    p.x = Math.max(-ROOM.w / 2 + .3, Math.min(ROOM.w / 2 - .3, p.x)); p.y = Math.max(.25, Math.min(ROOM.h - .3, p.y));
+    b.R.rotation.y = -open; b.L.rotation.y = open;
+    // face the flight direction, wings level-ish, body pitched with the climb
+    b.fwd.lerp(_r.copy(b.vel).normalize(), Math.min(1, dt * 4)).normalize();
+    _r.crossVectors(b.fwd, _up).normalize(); _n.crossVectors(_r, b.fwd).normalize();
+    _m.makeBasis(_r, b.fwd, _n); _q.setFromRotationMatrix(_m); b.g.quaternion.copy(_q);
+    // newcomers grow out of the glass; when there are too many, the oldest fade away
+    const age = now - b.born, grow = Math.min(1, age / .8), fade = b.leaving ? Math.max(0, 1 - (now - b.leaving) / 1.2) : 1;
+    b.g.scale.setScalar(b.scale * grow * fade);
+    if (b.leaving && fade <= 0) { scene.remove(b.g); flock.splice(i, 1); }
+  }
+}
+function releaseButterfly(u, v) {
+  if (!wingMat) return;
+  const from = tilt.localToWorld(new THREE.Vector3((u - .5) * PW, (.5 - v) * PH, .06));
+  const b = makeButterfly(from, new THREE.Vector3((Math.random() - .5) * .4, .25, .7), (kiosk ? .36 : .3) + Math.random() * .08);
+  b.target.set(from.x + (Math.random() - .5) * 2, from.y + .3, from.z + 1.2); b.nextT = clock.elapsedTime + 1.6;
+  const live = flock.filter(f => !f.leaving); if (live.length > (mobile ? 6 : 9)) live[0].leaving = clock.elapsedTime;
+}
+
+/* ---------------- 3D type (traced from the poster) ---------------- */
+const bronze = new THREE.MeshStandardMaterial({ color: '#6a4a2f', roughness: .34, metalness: .62, envMapIntensity: 1.25 });
+function extrudeSVG(d, w, h, width, depth) {
+  const data = new SVGLoader().parse(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}"><path d="${d}"/></svg>`);
+  const geos = [];
+  for (const p of data.paths) for (const s of SVGLoader.createShapes(p)) geos.push(new THREE.ExtrudeGeometry(s, { depth, bevelEnabled: true, bevelThickness: depth * .18, bevelSize: .35, bevelSegments: 3, curveSegments: 12 }));
+  const g = mergeGeometries(geos); const k = width / w; g.scale(k, -k, -k); g.computeBoundingBox(); // two flips = a rotation, so faces keep their winding
+  const bb = g.boundingBox; g.translate(-(bb.min.x + bb.max.x) / 2, -bb.min.y, -(bb.min.z + bb.max.z) / 2); g.computeVertexNormals(); g.computeBoundingBox(); return g;
+}
+function theLabel() { // the small outlined "THE" between BEYOND and FRAME
+  const c = document.createElement('canvas'); c.width = 256; c.height = 128; const x = c.getContext('2d');
+  x.font = '400 92px "Poiret One", serif'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.lineWidth = 3; x.strokeStyle = '#6a4a2f'; x.strokeText('THE', 128, 68);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
+  return new THREE.Mesh(new THREE.PlaneGeometry(.5, .25), new THREE.MeshBasicMaterial({ map: t, transparent: true, depthWrite: false }));
+}
+
+/* ---------------- layout ---------------- */
+const L = { logo: null, date: null };
+let base = { target: new THREE.Vector3(), dist: 5, yaw: 0, pitch: .05 };
+function layout() {
+  const w = vw(), h = vh(), asp = w / h; renderer.setSize(w, h, false); camera.aspect = asp;
+  const portrait = asp < .9;
+  Object.assign(BOUND, portrait ? { x: 1.45, y0: .6, y1: 3.6, z0: -2.6, z1: 2.0 } : { x: 3.4, y0: .45, y1: 3.4, z0: -2.9, z1: 1.9 });
+  if (portrait) {
+    poster.position.set(0, 2.08, 0);
+    camera.fov = 52; base.target.set(0, 1.72, 0); base.dist = 3.95 + Math.max(0, .56 - asp) * 3;
+    // stand the letters on the floor exactly where the printed poster puts them (bottom-right logo, bottom-left date)
+    placeCam(); anchorOnFloor(L.logo, .49, -.95, .78, 2.5); anchorOnFloor(L.date, -.66, -.79, .42, 1.15);
+  } else {
+    poster.position.set(-.35, 1.85, 0);
+    camera.fov = 36; base.target.set(.05, 1.55, 0); base.dist = 5.1 + Math.max(0, 1.5 - asp) * 2.2;
+    if (L.logo) { L.logo.position.set(1.75, 0, -.8); L.logo.rotation.y = -.42; L.logo.scale.setScalar(.8); }
+    if (L.date) { L.date.position.set(-1.95, 0, -.6); L.date.rotation.y = .42; L.date.scale.setScalar(.82); }
+  }
+  spot.target.position.copy(poster.position);
+  camera.updateProjectionMatrix();
+}
+addEventListener('resize', layout);
+function placeCam(y = 0, p = 0) { const t = base.target, r = base.dist; camera.position.set(t.x + Math.sin(y) * r, t.y + .18 + Math.sin(p + .04) * r, t.z + Math.cos(y) * r); camera.lookAt(t); camera.updateMatrixWorld(); camera.updateProjectionMatrix(); }
+const _ray = new THREE.Raycaster(), _floor = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), _hit = new THREE.Vector3(), _fw = new THREE.Vector3();
+function anchorOnFloor(obj, nx, ny, nw, baseWidth) {
+  if (!obj) return;
+  _ray.setFromCamera(new THREE.Vector2(nx, ny), camera); if (!_ray.ray.intersectPlane(_floor, _hit)) return;
+  camera.getWorldDirection(_fw); const d = _hit.clone().sub(camera.position).dot(_fw);
+  const viewW = 2 * d * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * camera.aspect;
+  obj.position.copy(_hit); obj.rotation.set(0, Math.atan2(camera.position.x - _hit.x, camera.position.z - _hit.z), 0); obj.scale.setScalar(nw / 2 * viewW / baseWidth);
+}
+
+/* ---------------- interaction ---------------- */
+const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
+let hitPlane = null; // invisible front face for picking
+let drag = null, yawT = 0, pitchT = 0, yaw = 0, pitch = 0, rotT = new THREE.Vector2(), rotV = new THREE.Vector2(), lastInput = -10;
+function pick(e) { const r = canvas.getBoundingClientRect(); ndc.set((e.clientX - r.left) / r.width * 2 - 1, -(e.clientY - r.top) / r.height * 2 + 1); ray.setFromCamera(ndc, camera); const h = hitPlane && ray.intersectObject(hitPlane)[0]; return h ? h.uv : null; }
+function burst(u, v, auto = false) {
+  if (!crack) return; burstT = clock.elapsedTime; burstUV.set(u, v); launchStreams(u, v);
+  crackGlass(u, v); spawnShards((u - .5) * PW, (.5 - v) * PH); spray(u, v); if (!auto || Math.random() < .3) releaseButterfly(u, v);
+  flash.position.set((u - .5) * PW, (.5 - v) * PH, .03); flash.userData.t = clock.elapsedTime;
+  rotV.x += (v - .5) * -.9; rotV.y += (u - .5) * 1.1; // the sheet flinches where it was hit
+}
+canvas.addEventListener('pointerdown', e => { canvas.setPointerCapture(e.pointerId); const uv = pick(e); drag = { x: e.clientX, y: e.clientY, uv, moved: 0, yaw: yawT, pitch: pitchT, rx: rotT.x, ry: rotT.y }; canvas.classList.add('dragging'); lastInput = clock.elapsedTime; });
+canvas.addEventListener('pointermove', e => {
+  if (!drag) { const uv = pick(e); crackMat.uniforms.uHover.value.set(uv ? uv.x : 9, uv ? 1 - uv.y : 9, uv ? 1 : 0); canvas.classList.toggle('over', !!uv); if (!mobile && !kiosk) { yawT = (e.clientX / innerWidth - .5) * -.16; pitchT = (e.clientY / innerHeight - .5) * -.05; } return; }
+  const dx = e.clientX - drag.x, dy = e.clientY - drag.y; drag.moved = Math.max(drag.moved, Math.hypot(dx, dy)); lastInput = clock.elapsedTime;
+  if (drag.uv) { rotT.set(Math.max(-.5, Math.min(.5, drag.rx + dy * .004)), Math.max(-.9, Math.min(.9, drag.ry + dx * .006))); }
+  else { yawT = Math.max(-.55, Math.min(.55, drag.yaw - dx * .0028)); pitchT = Math.max(-.12, Math.min(.16, drag.pitch + dy * .0012)); }
+});
+const end = e => { if (!drag) return; if (drag.uv && drag.moved < 10) { const uv = drag.uv; burst(uv.x, 1 - uv.y); } if (drag.uv) rotT.set(0, 0); drag = null; canvas.classList.remove('dragging'); };
+canvas.addEventListener('pointerup', end); canvas.addEventListener('pointercancel', end);
+canvas.addEventListener('pointerleave', () => { crackMat.uniforms.uHover.value.z = 0; });
+canvas.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); burst(.47, .44); } });
+canvas.tabIndex = 0;
+
+/* ---------------- load ---------------- */
+const clock = new THREE.Clock();
+async function load() {
+  const fontsReady = Promise.race([Promise.all(['500 40px "IBM Plex Mono"', '400 40px "Poiret One"'].map(f => document.fonts.load(f))), new Promise(r => setTimeout(r, 2500))]).then(() => step(15));
+  const art = new Promise((res, rej) => new THREE.TextureLoader().load('art.webp', t => { step(40); res(t); }, undefined, rej));
+  const cracks = fetch('cracks.json').then(r => r.json()).then(d => { step(20); return d; });
+  const wingP = new Promise((res, rej) => new THREE.TextureLoader().load('wing.webp', t => { step(5); res(t); }, undefined, rej));
+  const type = fetch('type.json').then(r => r.json()).then(d => { step(15); return d; });
+  const [tex, cd, td, wt] = await Promise.all([art, cracks, type, wingP, fontsReady]).then(r => [r[0], r[1], r[2], r[3]]);
+
+  tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = renderer.capabilities.getMaxAnisotropy(); tex.generateMipmaps = true;
+  // the printed sheet, mounted on a thin pane of glass
+  // the print keeps its own colours (lit from within, like a lightbox); the surface still catches reflections
+  const front = new THREE.MeshStandardMaterial({ color: '#000000', roughness: .5, metalness: 0, emissive: '#ffffff', emissiveMap: tex, emissiveIntensity: 1, toneMapped: false });
+  const edge = new THREE.MeshStandardMaterial({ color: '#e9dccb', roughness: .25, metalness: .1 });
+  const back = new THREE.MeshStandardMaterial({ color: '#d9ccb9', roughness: .9 });
+  const slab = new THREE.Mesh(new THREE.BoxGeometry(PW, PH, .014), [edge, edge, edge, edge, front, back]); slab.castShadow = true; tilt.add(slab);
+  const glass = new THREE.Mesh(new THREE.BoxGeometry(PW + .04, PH + .04, .01), new THREE.MeshPhysicalMaterial({ color: '#ffffff', roughness: .04, metalness: 0, transparent: true, opacity: .05, envMapIntensity: 2.2, clearcoat: 1, clearcoatRoughness: .03, depthWrite: false }));
+  glass.position.z = .014; glass.renderOrder = 3; tilt.add(glass);
+  glassMat.uniforms.uArt.value = tex;
+  const glassCracks = new THREE.Mesh(new THREE.PlaneGeometry(PW, PH), glassMat); glassCracks.position.z = .021; glassCracks.renderOrder = 4; tilt.add(glassCracks);
+  tilt.add(shards);
+  hitPlane = new THREE.Mesh(new THREE.PlaneGeometry(PW, PH), new THREE.MeshBasicMaterial({ visible: false })); hitPlane.position.z = .02; tilt.add(hitPlane);
+  // soft halo of light behind the sheet
+  const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color: '#fff1d6', transparent: true, opacity: .55, blending: THREE.AdditiveBlending, depthWrite: false })); halo.scale.set(PW * 2.4, PH * 1.7, 1); halo.position.z = -.3; halo.material.opacity = .32; poster.add(halo);
+
+  glyphMat.uniforms.uAtlas.value = buildGlyphAtlas();
+  wt.colorSpace = THREE.SRGBColorSpace; wt.anisotropy = 8;
+  wingMat = new THREE.MeshStandardMaterial({ map: wt, alphaTest: .32, side: THREE.DoubleSide, roughness: .75, emissive: '#ffffff', emissiveMap: wt, emissiveIntensity: .28 });
+  wingGeo = new THREE.PlaneGeometry(WING.aspect, 1); wingGeo.translate(WING.aspect / 2, WING.hinge - .5, 0);
+  for (let i = 0; i < (mobile ? 3 : 5); i++) { const b = makeButterfly(new THREE.Vector3((Math.random() * 2 - 1) * 3, 1 + Math.random() * 2, -2 + Math.random() * 3), new THREE.Vector3(Math.random() - .5, 0, Math.random() - .5), (kiosk ? .34 : .28) + Math.random() * .1); b.born = -9; newTarget(b, 0); }
+  buildCracks(cd);
+
+  const logoG = new THREE.Group();
+  const logo = new THREE.Mesh(extrudeSVG(td.logo.d, td.logo.w, td.logo.h, 2.5, 7), bronze); logo.castShadow = true; logo.receiveShadow = true; logoG.add(logo);
+  const the = theLabel(); the.position.set(-2.5 / 2 + (19 + 18) / td.logo.w * 2.5, (td.logo.h - 118) / td.logo.w * 2.5, .06); logoG.add(the);
+  scene.add(logoG); L.logo = logoG;
+  const dateG = new THREE.Group(); const date = new THREE.Mesh(extrudeSVG(td.date.d, td.date.w, td.date.h, 1.15, 5), bronze); date.castShadow = true; dateG.add(date); scene.add(dateG); L.date = dateG;
+  // a wall label beside the work, as in any gallery
+  { const c = document.createElement('canvas'); c.width = 600; c.height = 340; const x = c.getContext('2d'); x.fillStyle = '#f6f1e9'; x.fillRect(0, 0, 600, 340);
+    x.fillStyle = '#5b4330'; x.font = '400 46px "Poiret One", serif'; x.fillText('BEYOND THE FRAME', 36, 84);
+    x.font = '500 24px "Noto Sans KR", sans-serif'; x.fillText('2026 졸업전시 포스터', 36, 150);
+    x.font = '300 21px "Noto Sans KR", sans-serif'; x.fillStyle = '#7d6650'; x.fillText('디지털 그래픽 · 깨진 유리 · 코드', 36, 196); x.fillText('한국폴리텍 서울정수캠퍼스 시각디자인과', 36, 232);
+    x.font = '400 17px "IBM Plex Mono", monospace'; x.fillText('11.17 — 11.18 · 제3공학관 2층', 36, 296);
+    const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8;
+    const lab = new THREE.Mesh(new THREE.BoxGeometry(.36, .204, .008), [edge, edge, edge, edge, new THREE.MeshStandardMaterial({ map: t, roughness: .8 }), edge]);
+    lab.position.set(-1.25, 1.42, ROOM.back + .01); lab.castShadow = true; scene.add(lab); }
+
+  layout();
+  $('loading').classList.add('done');
+  setTimeout(() => burst(cd.burst[0], cd.burst[1], true), reduce ? 200 : 1400);
+}
+
+/* ---------------- loop ---------------- */
+let nextAuto = 7, lastT = 0;
+function tick() {
+  const t = clock.getElapsedTime(), dt = Math.min(.05, Math.max(.001, t - lastT)); lastT = t;
+  // camera: gentle drift plus whatever the visitor dragged
+  const k = 1 - Math.pow(.0015, dt);
+  yaw += (yawT + (reduce ? 0 : Math.sin(t * .11) * .05) - yaw) * k; pitch += (pitchT - pitch) * k;
+  const p = base.target, r = base.dist;
+  camera.position.set(p.x + Math.sin(yaw) * r, p.y + .18 + Math.sin(pitch + .04) * r, p.z + Math.cos(yaw) * r); camera.lookAt(p);
+  // poster floats; dragged tilt springs back
+  rotV.x += (rotT.x - tilt.rotation.x) * 24 * dt; rotV.y += (rotT.y - tilt.rotation.y) * 24 * dt; rotV.multiplyScalar(Math.pow(.02, dt));
+  tilt.rotation.x += rotV.x * dt; tilt.rotation.y += rotV.y * dt;
+  if (!reduce) { poster.rotation.y = Math.sin(t * .37) * .07; poster.rotation.z = Math.sin(t * .29) * .012; tilt.position.y = Math.sin(t * .8) * .045; }
+  if (crack) {
+    crackMat.uniforms.uT.value = t - burstT; crackMat.uniforms.uIdle.value = Math.min(1, t * .3);
+    updateGlyphs(t); updateShards(t); updateFlock(t, dt);
+    glassMat.uniforms.uT.value = t; glassMat.uniforms.uFT.value = t - freshT; glassMat.uniforms.uAng.value = yaw - poster.rotation.y - tilt.rotation.y + tilt.rotation.x * .6;
+    const fe = t - (flash.userData.t ?? -9); flash.material.opacity = Math.max(0, 1 - fe * 1.6); flash.scale.setScalar(.12 + fe * .9);
+    if (!reduce && t - lastInput > 9 && t > nextAuto) { nextAuto = t + 8; const a = Math.random() * 6.28, d = Math.random() * .12; burst(.47 + Math.cos(a) * d, .44 + Math.sin(a) * d * .7, true); }
+  }
+  shaftMat.uniforms.uT.value = t; dust.uniforms.uT.value = t;
+  for (const l of leaks) l.offset.x = t * .004;
+  renderer.render(scene, camera);
+  requestAnimationFrame(tick);
+}
+layout();
+load().catch(err => { console.error(err); $('loading').innerHTML = '<p>전시장을 불러오지 못했어요.<br>새로고침해 주세요.</p>'; });
+requestAnimationFrame(tick);
+</script>
+
+</body>
+</html>
