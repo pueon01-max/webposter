@@ -8,7 +8,7 @@
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+KR:wght@300;400;500&family=Poiret+One&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Courier+Prime:wght@400;700&family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+KR:wght@300;400;500&family=Poiret+One&display=swap">
 <style>
 /* Layout: one full-bleed WebGL gallery; the poster's own typography is spread to the four screen edges like the printed sheet. */
 :root {
@@ -31,11 +31,12 @@ body { background: var(--paper); color: var(--ink); font-family: var(--body); ov
 html.letterbox body { background: #17110b; }
 html.letterbox #stage { inset: auto; top: 50%; left: 50%; height: min(100vh, 177.78vw); width: calc(min(100vh, 177.78vw) * .5625); translate: -50% -50%; }
 #c { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; cursor: grab; -webkit-user-select: none; user-select: none; }
+#bf { position: fixed; inset: 0; width: 100%; height: 100%; display: block; pointer-events: none; z-index: 1; }
 #c.dragging { cursor: grabbing; }
 #c.over { cursor: pointer; }
 .grain { position: fixed; inset: 0; z-index: 2; pointer-events: none; mix-blend-mode: multiply; opacity: .16;
   background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 .35  0 0 0 0 .26  0 0 0 0 .18  0 0 0 1.1 -.25'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>"); }
-.vignette { position: fixed; inset: 0; z-index: 1; pointer-events: none; background: radial-gradient(120% 90% at 50% 45%, transparent 55%, rgba(70, 48, 26, .28) 100%); }
+.vignette { position: fixed; inset: 0; z-index: 2; pointer-events: none; background: radial-gradient(120% 90% at 50% 45%, transparent 55%, rgba(70, 48, 26, .28) 100%); }
 
 .ui { position: fixed; z-index: 3; pointer-events: none; color: var(--ink); text-shadow: 0 0 18px rgba(238, 229, 216, .9); }
 .ui * { pointer-events: auto; }
@@ -101,6 +102,7 @@ html, body { -webkit-touch-callout: none; }
 
 <div id="stage">
 <canvas id="c" aria-label="3D 전시장: 공중에 떠 있는 BEYOND THE FRAME 포스터. 포스터를 누르면 균열을 따라 코드가 퍼집니다."></canvas>
+<canvas id="bf" aria-hidden="true"></canvas>
 <div class="vignette"></div>
 <div class="grain"></div>
 
@@ -121,6 +123,7 @@ html, body { -webkit-touch-callout: none; }
 </div>
 <div id="loading"><div><p>Beyond the Frame<br>전시장 여는 중</p><div class="bar"><i id="bar"></i></div></div></div>
 
+<script src="butterfly-gl.js"></script>
 <script type="importmap">
 { "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
                "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/" } }
@@ -179,15 +182,44 @@ plane(ROOM.w, ROOM.d, ceilMat, [0, ROOM.h, zMid], [Math.PI / 2, 0, 0]);
 const skirt = new THREE.MeshBasicMaterial({ color: '#cbbba6' });
 plane(ROOM.w, .06, skirt, [0, .03, ROOM.back + .002], [0, 0, 0]);
 
-// polished concrete: a dimmed mirror under a translucent floor
-const mirror = new Reflector(new THREE.PlaneGeometry(ROOM.w, ROOM.d), { textureWidth: mobile ? 512 : kiosk ? 1536 : 1024, textureHeight: mobile ? 512 : kiosk ? 1536 : 1024, color: 0x9a8f80, clipBias: .003 });
+// the floor is a sheet of still water: a mirror whose reflection is bent by slow swells and the rings a touch sends out
+const RIPPLES = Array.from({ length: 6 }, () => new THREE.Vector4(0, 0, -99, 0)); let ripI = 0;
+const WaterShader = {
+  name: 'GalleryWater',
+  uniforms: { color: { value: null }, tDiffuse: { value: null }, textureMatrix: { value: null }, uT: { value: 0 }, uRip: { value: RIPPLES } },
+  vertexShader: `uniform mat4 textureMatrix; varying vec4 vUv; varying vec3 vW;
+    #include <common>
+    void main(){ vUv = textureMatrix * vec4(position, 1.); vec4 w = modelMatrix * vec4(position, 1.); vW = w.xyz; gl_Position = projectionMatrix * viewMatrix * w; }`,
+  fragmentShader: `uniform vec3 color; uniform sampler2D tDiffuse; uniform float uT; uniform vec4 uRip[6]; varying vec4 vUv; varying vec3 vW;
+    #include <common>
+    vec2 wave(vec2 p, vec2 d, float f, float s, float a){ return d * cos(dot(p, d) * f + uT * s) * a * f; }
+    float h2(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+    float vnoise(vec2 p){ vec2 i = floor(p), f = fract(p); f = f*f*(3.-2.*f); return mix(mix(h2(i), h2(i+vec2(1,0)), f.x), mix(h2(i+vec2(0,1)), h2(i+vec2(1,1)), f.x), f.y); }
+    void main(){
+      vec2 p = vW.xz;
+      vec2 g = wave(p, normalize(vec2(1., .3)), 2.2, 1.0, .011) + wave(p, normalize(vec2(-.45, 1.)), 3.4, 1.5, .008)
+             + wave(p, normalize(vec2(.7, -.8)), 6.1, 2.2, .0045) + wave(p, normalize(vec2(-1., -.25)), 10.3, 3.0, .0026);
+      g += (vec2(vnoise(p*2.6 + uT*.22), vnoise(p*2.6 + 7.3 - uT*.18)) - .5) * .06;
+      for (int i = 0; i < 6; i++) { vec4 r = uRip[i]; float age = uT - r.z; if (age < 0. || age > 5.) continue;
+        vec2 d = p - r.xy; float dist = length(d), front = age * .85;
+        float amp = r.w * exp(-age * .75) * exp(-pow((dist - front) * 2.6, 2.)) * .11;
+        g += d / (dist + 1e-3) * cos((dist - front) * 24.) * amp; }
+      vec3 N = normalize(vec3(-g.x, 1., -g.y)), V = normalize(cameraPosition - vW);
+      vec4 uv = vUv; uv.xy += g * 1.5 * uv.w;
+      vec3 refl = texture2DProj(tDiffuse, uv).rgb;
+      float fres = .32 + .62 * pow(1. - max(dot(N, V), 0.), 4.);
+      vec3 deep = vec3(.6, .5, .38) * (.85 + .3 * vnoise(p * .7 + uT * .03));
+      vec3 col = mix(deep, refl * color, clamp(fres + .3, 0., 1.));
+      vec3 L = normalize(vec3(-.35, .92, .3)); float spec = pow(max(dot(reflect(-L, N), V), 0.), 220.) * 1.4;
+      col += vec3(1., .86, .55) * spec;
+      gl_FragColor = vec4(col, 1.);
+      #include <tonemapping_fragment>
+      #include <colorspace_fragment>
+    }`,
+};
+const mirror = new Reflector(new THREE.PlaneGeometry(ROOM.w, ROOM.d), { shader: WaterShader, textureWidth: mobile ? 512 : kiosk ? 1536 : 1024, textureHeight: mobile ? 512 : kiosk ? 1536 : 1024, color: 0xf3e6cf, clipBias: .003 });
 mirror.rotation.x = -Math.PI / 2; mirror.position.set(0, 0, zMid); scene.add(mirror);
-const floorTex = (() => { const c = document.createElement('canvas'); c.width = c.height = 512; const x = c.getContext('2d');
-  x.fillStyle = '#c9baa5'; x.fillRect(0, 0, 512, 512);
-  for (let i = 0; i < 9000; i++) { const g = 180 + Math.random() * 50 | 0; x.fillStyle = `rgba(${g},${g - 12},${g - 28},${Math.random() * .12})`; x.fillRect(Math.random() * 512, Math.random() * 512, 2, 2); }
-  x.strokeStyle = 'rgba(120,100,80,.18)'; x.lineWidth = 2; x.strokeRect(0, 0, 512, 512); // slab joints
-  const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(ROOM.w / 3, ROOM.d / 3); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; return t; })();
-const floor = plane(ROOM.w, ROOM.d, new THREE.MeshStandardMaterial({ map: floorTex, roughness: .5, metalness: 0, transparent: true, opacity: .8 }), [0, .002, zMid], [-Math.PI / 2, 0, 0]);
+function ripple(x, z, amp = 1) { RIPPLES[ripI].set(x, z, mirror.material.uniforms.uT.value, amp); ripI = (ripI + 1) % RIPPLES.length; }
 
 // skylight grid in the ceiling
 const skyMat = new THREE.MeshBasicMaterial({ color: '#fff8ec' });
@@ -286,7 +318,7 @@ let burstT = -10, burstUV = new THREE.Vector2(.47, .44);
 
 function buildGlyphAtlas() {
   const S = 64, cols = 16, c = document.createElement('canvas'); c.width = c.height = S * cols; const x = c.getContext('2d');
-  x.font = `500 ${S * .62}px "IBM Plex Mono", ui-monospace, monospace`; x.textAlign = 'center'; x.textBaseline = 'middle';
+  x.font = `700 ${S * .66}px "Courier Prime", "Courier New", monospace`; // the poster's typewriter code x.textAlign = 'center'; x.textBaseline = 'middle';
   for (let i = 0; i < 95; i++) { const ch = String.fromCharCode(32 + i), cx = (i % cols) * S + S / 2, cy = Math.floor(i / cols) * S + S / 2;
     // three layers in one atlas: a faint drop shadow (rgb 0), a coloured glow (green), a white-hot core (red)
     x.shadowColor = 'rgba(0,0,0,.55)'; x.shadowBlur = S * .12; x.shadowOffsetX = S * .03; x.shadowOffsetY = S * .05; x.fillStyle = 'rgba(0,0,0,.35)'; x.fillText(ch, cx, cy);
@@ -308,10 +340,10 @@ const glyphMat = new THREE.ShaderMaterial({
       vec2 cell=vec2(mod(g,16.), floor(g/16.)); vUv=(cell+vec2(uv.x, 1.-uv.y))/16.; vUv.y=1.-vUv.y; vA=iInfo.z; vTint=iInfo.w;
       gl_Position=projectionMatrix*modelViewMatrix*vec4(iPos.xyz+vec3(p,0.),1.); }`,
   fragmentShader: `uniform sampler2D uAtlas; varying vec2 vUv; varying float vA; varying float vTint;
-    vec3 tint(float k){ return k<.5 ? vec3(1.,.78,.3) : k<1.5 ? vec3(1.,.55,.42) : k<2.5 ? vec3(.3,.82,1.) : k<3.5 ? vec3(.68,.5,1.) : vec3(.45,1.,.8); }
+    vec3 tint(float k){ return vec3(1., .72, .26); } // one gold for all code
     void main(){ vec4 t=texture2D(uAtlas, vUv); float a=t.a*vA; if(a<.01) discard;
       float core=smoothstep(.25,.85,t.r), glow=clamp(t.g*1.6,0.,1.);
-      vec3 c = mix(vec3(.36,.22,.1), mix(tint(vTint)*1.25, vec3(1.,.99,.96), core), glow); gl_FragColor=vec4(c, a * mix(.55, 1., glow)); }`,
+      vec3 c = mix(vec3(.4,.25,.08), mix(tint(vTint)*1.2, vec3(1.,.95,.78), core), glow); gl_FragColor=vec4(c, a * mix(.55, 1., glow)); }`,
 });
 const glyphs = new THREE.Mesh(glyphGeo, glyphMat); glyphs.frustumCulled = false; glyphs.renderOrder = 5; tilt.add(glyphs);
 
@@ -326,8 +358,8 @@ const crackMat = new THREE.ShaderMaterial({
       vA = clamp(wave*.85 + after*.55 + hov*.6 + twinkle, 0., 1.2); vR = aR;
       vec4 mv=modelViewMatrix*vec4(position,1.); gl_PointSize = (1.6 + 5.5*wave + 2.*hov) * uPx * (2.6 / -mv.z); gl_Position=projectionMatrix*mv; }`,
   fragmentShader: `varying float vA; varying float vR; void main(){ float d=length(gl_PointCoord-.5); float a=smoothstep(.5,.0,d)*vA; if(a<.004) discard;
-    vec3 prism = .5 + .5*cos(6.28*(vR + vec3(0., .33, .67)));           // light split by the broken edge
-    gl_FragColor=vec4(mix(vec3(1.), prism, .45)*a, a); }`,
+    vec3 gold = mix(vec3(1., .78, .4), vec3(1., .95, .82), fract(vR*7.));
+    gl_FragColor=vec4(gold*a, a); }`,
 });
 
 function buildCracks(data) {
@@ -360,6 +392,23 @@ function propagate(u, v) {
 }
 
 const toLocal = (px, py) => new THREE.Vector2((px / crack.W - .5) * PW, (.5 - py / crack.H) * PH);
+// the lines of code printed on the poster run out from the burst toward the edges; their ends (u, v, 0–1 from top-left)
+const RAY_C = [.46, .43];
+const RAYS = [[.484, .03], [.347, .1], [.567, .075], [1, .14], [0, .205], [0, .41], [0, .46], [.03, .9], [1, .59], [.98, 1], [.33, .72]];
+function extendRays(u, v) {
+  const now = clock.elapsedTime, a0 = Math.atan2(v - RAY_C[1], u - RAY_C[0]);
+  const ang = r => Math.atan2(r[1] - RAY_C[1], r[0] - RAY_C[0]);
+  const order = RAYS.map((r, i) => [Math.abs(Math.atan2(Math.sin(ang(r) - a0), Math.cos(ang(r) - a0))), i]).sort((a, b) => a[0] - b[0]);
+  const pick = order.slice(0, 3).map(o => o[1]); const extra = (Math.random() * RAYS.length) | 0; if (!pick.includes(extra)) pick.push(extra);
+  pick.forEach((ri, k) => {
+    const [eu, ev] = RAYS[ri], e = new THREE.Vector2((eu - .5) * PW, (.5 - ev) * PH), c = new THREE.Vector2((RAY_C[0] - .5) * PW, (.5 - RAY_C[1]) * PH);
+    const dir = e.clone().sub(c).normalize(), leftward = dir.x < 0;
+    let text = CODE[(Math.random() * CODE.length) | 0] + '  ' + CODE[(Math.random() * CODE.length) | 0]; if (!leftward) text = [...text].reverse().join('');
+    streams.push({ ray: true, tint: 0, pts: [e.clone().addScaledVector(dir, -.004), e.clone()], cum: [0, .004], L: .004, dir, leftward, text,
+      t0: now + .25 + k * .18, v: .32 + Math.random() * .1, size: kiosk ? .034 : .03, seed: 0, lift: .25 + Math.random() * .25, drift: (Math.random() - .5) * .25 });
+  });
+  while (streams.length > 64) streams.shift();
+}
 function launchStreams(u, v) {
   const C = crack, { tx, ty, SPEED } = propagate(u, v), { n, xy, deg, dist, parent } = C;
   // pick crack ends spread around the touch point, farthest first
@@ -368,7 +417,7 @@ function launchStreams(u, v) {
   const bins = new Map(), want = mobile ? 9 : 13;
   for (const i of ends) { const a = Math.atan2(xy[i * 2 + 1] - ty, xy[i * 2] - tx), b = Math.floor((a + Math.PI) / (2 * Math.PI) * want);
     if (bins.has(b)) continue; let len = 0, j = i; while (parent[j] >= 0) { j = parent[j]; len++; } if (len < 40) continue; bins.set(b, i); }
-  const now = clock.elapsedTime; streams.length = Math.min(streams.length, 50);
+  const now = clock.elapsedTime; streams.length = Math.min(streams.length, 50); return; // crack paths now only light up; the code comes out along the printed lines
   let s = 0;
   for (const end of bins.values()) {
     const chain = []; let j = end; while (j >= 0) { chain.push(j); j = parent[j]; } chain.reverse();
@@ -402,8 +451,10 @@ function updateGlyphs(now) {
       let x, y, z = .02, rot, a = 1, sc = st.size;
       if (s <= st.L) { rot = samplePath(st, s, tmp); x = tmp.x; y = tmp.y; a = Math.min(1, s / .04); }
       else { // off the end of the crack: keep going and lift off the poster into the room
-        const e = s - st.L; x = st.pts[st.pts.length - 1].x + st.dir.x * e; y = st.pts[st.pts.length - 1].y + st.dir.y * e + e * e * .12;
-        z = .02 + e * e * st.lift + e * .25; rot = Math.atan2(st.dir.y, st.dir.x) + e * st.drift * 2.2; a = Math.max(0, 1 - e / 1.5); sc *= 1 + e * .8; }
+        const e = s - st.L; x = st.pts[st.pts.length - 1].x + st.dir.x * e; y = st.pts[st.pts.length - 1].y + st.dir.y * e;
+        if (st.ray) { // the printed line simply keeps going past the frame, then slowly lifts off and dissolves
+          z = .02 + e * e * st.lift; rot = Math.atan2(st.dir.y, st.dir.x) + e * e * st.drift; a = Math.min(1, e / .05) * Math.max(0, 1 - e / 2.4); sc *= 1 + e * .55; }
+        else { y += e * e * .12; z = .02 + e * e * st.lift + e * .25; rot = Math.atan2(st.dir.y, st.dir.x) + e * st.drift * 2.2; a = Math.max(0, 1 - e / 1.5); sc *= 1 + e * .8; } }
       if (st.leftward) rot += Math.PI;
       if (a <= .003) continue; alive = true;
       gPos[c * 4] = x; gPos[c * 4 + 1] = y; gPos[c * 4 + 2] = z; gPos[c * 4 + 3] = sc;
@@ -467,7 +518,7 @@ const glassMat = new THREE.ShaderMaterial({
       // refraction: the print seen through a broken edge is nudged sideways
       vec2 off = vec2(cos(facet*6.28), sin(facet*6.28)) * (.004 + fm*.004);
       vec3 seen = vec3(texture2D(uArt, vUv + off).r, texture2D(uArt, vUv + off*1.5).g, texture2D(uArt, vUv + off*2.1).b); // dispersion
-      vec3 prism = .55 + .45*cos(6.28*(facet*3. + uT*.05 + vec3(0., .33, .67)));
+      vec3 prism = mix(vec3(1., .8, .45), vec3(1., .96, .86), .5 + .5*sin(facet*20. + uT*.3)); // gold light in the glass
       vec3 light = prism * (glint*1.1 + sweep*1.2) + vec3(1.) * fresh;
       float a = m * (.35 + glint*.6 + sweep*.7) + fresh*.6;
       gl_FragColor = vec4(seen * (1. - hair) + light, clamp(a + fm*.35, 0., 1.));
@@ -483,7 +534,7 @@ function crackGlass(u, v) {
 
 // shards that flick off where the glass breaks
 const SH = 16, shardGeo = new THREE.BufferGeometry(); shardGeo.setAttribute('position', new THREE.Float32BufferAttribute([0, 1, 0, -.7, -.6, 0, .8, -.4, 0], 3)); shardGeo.computeVertexNormals();
-const shards = new THREE.InstancedMesh(shardGeo, new THREE.MeshBasicMaterial({ color: '#fff6e8', transparent: true, opacity: .55, side: THREE.DoubleSide, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false }), SH);
+const shards = new THREE.InstancedMesh(shardGeo, new THREE.MeshBasicMaterial({ color: '#ffe2a8', transparent: true, opacity: .55, side: THREE.DoubleSide, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false }), SH);
 shards.instanceMatrix.setUsage(THREE.DynamicDrawUsage); shards.renderOrder = 6; shards.frustumCulled = false;
 const shardState = Array.from({ length: SH }, () => ({ t: -9 })), dummy = new THREE.Object3D();
 function spawnShards(x, y) { const now = clock.elapsedTime; let n = 0;
@@ -509,11 +560,18 @@ function spray(u, v) {
 /* ---------------- butterflies: the poster's cracked butterfly, cut out and given wings ---------------- */
 const WING = { aspect: 607 / 995, hinge: .5969 };
 const flock = []; let wingMat = null, wingGeo = null;
+// the glowing gold butterflies (butterfly-gl.js) draw on their own transparent layer; the flight is simulated here in the
+// gallery's 3D space and handed to them every frame as a screen pose
+let BGL = null;
+try { BGL = typeof createButterflyGL === 'function' ? createButterflyGL(document.getElementById('bf'), { tint: 'gold', dustTint: 'gold', sky: true, dense: 1, flapHz: 2.6, maxDpr: kiosk ? 1.5 : Math.min(devicePixelRatio || 1, 2) }) : null; } catch (e) { console.warn(e); BGL = null; }
+if (BGL) { BGL.butterflies.length = 0; BGL.glow = 1.15; BGL.dustBright = 1.1; BGL.dustLife = 1.2; }
 const BOUND = { x: 3.6, y0: .45, y1: 3.5, z0: -2.9, z1: 1.9 };
 function makeButterfly(pos, vel, scale) {
   const g = new THREE.Group(), R = new THREE.Mesh(wingGeo, wingMat), L = new THREE.Mesh(wingGeo, wingMat); L.scale.x = -1;
-  R.castShadow = L.castShadow = true; g.add(R, L); g.scale.setScalar(scale); g.position.copy(pos); scene.add(g);
-  const b = { g, R, L, vel: vel.clone(), target: new THREE.Vector3(), nextT: 0, phase: Math.random() * 6.28, freq: 8.5 + Math.random() * 3.5, glide: 0, born: clock.elapsedTime, scale, fwd: new THREE.Vector3(0, 0, 1) };
+  R.castShadow = L.castShadow = true; g.add(R, L); g.scale.setScalar(scale); g.position.copy(pos); if (!BGL) scene.add(g);
+  let gl2 = null;
+  if (BGL) { const off = Math.random() * 6.28; gl2 = { tint: 'gold', ti: 0, pos: [0, 0, 0], scale: 1, view: 'front', seed: Math.random() * 9, off, phase: off, prevPhase: off, prevM: null, hzMul: .85 + Math.random() * .35, dust: .7, pose: { x: 0, y: 0, z: 0, scale: 0, yaw: 0, pitch: -.5, roll: 0 } }; BGL.butterflies.push(gl2); }
+  const b = { gl2, g, R, L, vel: vel.clone(), target: new THREE.Vector3(), nextT: 0, phase: Math.random() * 6.28, freq: 8.5 + Math.random() * 3.5, glide: 0, born: clock.elapsedTime, scale, fwd: new THREE.Vector3(0, 0, 1) };
   flock.push(b); return b;
 }
 function newTarget(b, now) {
@@ -542,15 +600,28 @@ function updateFlock(now, dt) {
     // newcomers grow out of the glass; when there are too many, the oldest fade away
     const age = now - b.born, grow = Math.min(1, age / .8), fade = b.leaving ? Math.max(0, 1 - (now - b.leaving) / 1.2) : 1;
     b.g.scale.setScalar(b.scale * grow * fade);
-    if (b.leaving && fade <= 0) { scene.remove(b.g); flock.splice(i, 1); }
+    if (b.gl2) poseGL(b, b.scale * grow * fade, now);
+    if (b.leaving && fade <= 0) { scene.remove(b.g); flock.splice(i, 1); if (b.gl2) BGL.butterflies.splice(BGL.butterflies.indexOf(b.gl2), 1); }
   }
 }
+const _p0 = new THREE.Vector3(), _p1 = new THREE.Vector3();
+function poseGL(b, s, now) {
+  const W = vw(), H = vh(), p = b.g.position;
+  _p0.copy(p).project(camera); _p1.copy(p).addScaledVector(b.vel, .15).project(camera);
+  const px = (_p0.x * .5 + .5) * W, py = (-_p0.y * .5 + .5) * H, dx = (_p1.x - _p0.x) * W, dy = -(_p1.y - _p0.y) * H;
+  const dist = p.distanceTo(camera.position), spanPx = (s * 1.1) / (2 * dist * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2))) * H;
+  const w = BGL.toWorld(px, py), q = b.gl2.pose;
+  q.x = w[0]; q.y = w[1]; q.z = 0; q.scale = Math.max(0, spanPx * BGL.unitsPerPx() / 2.2);
+  // head points where it is flying on screen; turn the short way round, smoothly
+  const heading = Math.atan2(-dx, -dy), turn = ((heading - q.roll) % (Math.PI * 2) + Math.PI * 3) % (Math.PI * 2) - Math.PI; q.roll += turn * .15;
+  q.yaw = .35 * Math.sin(now * .6 + b.gl2.off); q.pitch = -.55 + Math.max(-.35, Math.min(.35, -b.vel.z * .5));
+}
 function releaseButterfly(u, v) {
-  if (!wingMat) return;
+  if (!wingMat && !BGL) return;
   const from = tilt.localToWorld(new THREE.Vector3((u - .5) * PW, (.5 - v) * PH, .06));
   const b = makeButterfly(from, new THREE.Vector3((Math.random() - .5) * .4, .25, .7), (kiosk ? .36 : .3) + Math.random() * .08);
   b.target.set(from.x + (Math.random() - .5) * 2, from.y + .3, from.z + 1.2); b.nextT = clock.elapsedTime + 1.6;
-  const live = flock.filter(f => !f.leaving); if (live.length > (mobile ? 6 : 9)) live[0].leaving = clock.elapsedTime;
+  const live = flock.filter(f => !f.leaving); if (live.length > (mobile ? 5 : 7)) live[0].leaving = clock.elapsedTime;
 }
 
 /* ---------------- 3D type (traced from the poster) ---------------- */
@@ -575,7 +646,7 @@ let base = { target: new THREE.Vector3(), dist: 5, yaw: 0, pitch: .05 };
 function layout() {
   const w = vw(), h = vh(), asp = w / h; renderer.setSize(w, h, false); camera.aspect = asp;
   const portrait = asp < .9;
-  Object.assign(BOUND, portrait ? { x: 1.45, y0: .6, y1: 3.6, z0: -2.6, z1: 2.0 } : { x: 3.4, y0: .45, y1: 3.4, z0: -2.9, z1: 1.9 });
+  Object.assign(BOUND, portrait ? { x: 1.3, y0: .9, y1: 3.4, z0: .35, z1: 2.0 } : { x: 3.2, y0: .6, y1: 3.2, z0: .35, z1: 2.2 });
   if (portrait) {
     poster.position.set(0, 2.08, 0);
     camera.fov = 52; base.target.set(0, 1.72, 0); base.dist = 3.95 + Math.max(0, .56 - asp) * 3;
@@ -608,7 +679,8 @@ let drag = null, yawT = 0, pitchT = 0, yaw = 0, pitch = 0, rotT = new THREE.Vect
 function pick(e) { const r = canvas.getBoundingClientRect(); ndc.set((e.clientX - r.left) / r.width * 2 - 1, -(e.clientY - r.top) / r.height * 2 + 1); ray.setFromCamera(ndc, camera); const h = hitPlane && ray.intersectObject(hitPlane)[0]; return h ? h.uv : null; }
 function burst(u, v, auto = false) {
   if (!crack) return; burstT = clock.elapsedTime; burstUV.set(u, v); launchStreams(u, v);
-  crackGlass(u, v); spawnShards((u - .5) * PW, (.5 - v) * PH); spray(u, v); if (!auto || Math.random() < .3) releaseButterfly(u, v);
+  crackGlass(u, v); spawnShards((u - .5) * PW, (.5 - v) * PH); extendRays(u, v);
+  { const w = tilt.localToWorld(new THREE.Vector3((u - .5) * PW, (.5 - v) * PH, 0)); ripple(w.x, w.z + .25, 1); } if (!auto || Math.random() < .3) releaseButterfly(u, v);
   flash.position.set((u - .5) * PW, (.5 - v) * PH, .03); flash.userData.t = clock.elapsedTime;
   rotV.x += (v - .5) * -.9; rotV.y += (u - .5) * 1.1; // the sheet flinches where it was hit
 }
@@ -628,7 +700,7 @@ canvas.tabIndex = 0;
 /* ---------------- load ---------------- */
 const clock = new THREE.Clock();
 async function load() {
-  const fontsReady = Promise.race([Promise.all(['500 40px "IBM Plex Mono"', '400 40px "Poiret One"'].map(f => document.fonts.load(f))), new Promise(r => setTimeout(r, 2500))]).then(() => step(15));
+  const fontsReady = Promise.race([Promise.all(['500 40px "IBM Plex Mono"', '700 40px "Courier Prime"', '400 40px "Poiret One"'].map(f => document.fonts.load(f))), new Promise(r => setTimeout(r, 2500))]).then(() => step(15));
   const art = new Promise((res, rej) => new THREE.TextureLoader().load('art.webp', t => { step(40); res(t); }, undefined, rej));
   const cracks = fetch('cracks.json').then(r => r.json()).then(d => { step(20); return d; });
   const wingP = new Promise((res, rej) => new THREE.TextureLoader().load('wing.webp', t => { step(5); res(t); }, undefined, rej));
@@ -655,7 +727,7 @@ async function load() {
   wt.colorSpace = THREE.SRGBColorSpace; wt.anisotropy = 8;
   wingMat = new THREE.MeshStandardMaterial({ map: wt, alphaTest: .32, side: THREE.DoubleSide, roughness: .75, emissive: '#ffffff', emissiveMap: wt, emissiveIntensity: .28 });
   wingGeo = new THREE.PlaneGeometry(WING.aspect, 1); wingGeo.translate(WING.aspect / 2, WING.hinge - .5, 0);
-  for (let i = 0; i < (mobile ? 3 : 5); i++) { const b = makeButterfly(new THREE.Vector3((Math.random() * 2 - 1) * 3, 1 + Math.random() * 2, -2 + Math.random() * 3), new THREE.Vector3(Math.random() - .5, 0, Math.random() - .5), (kiosk ? .34 : .28) + Math.random() * .1); b.born = -9; newTarget(b, 0); }
+  for (let i = 0; i < (mobile ? 3 : 4); i++) { const b = makeButterfly(new THREE.Vector3((Math.random() * 2 - 1) * 1.4, 1.1 + Math.random() * 2, .5 + Math.random() * 1.3), new THREE.Vector3(Math.random() - .5, 0, Math.random() - .5), (kiosk ? .34 : .28) + Math.random() * .1); b.born = -9; newTarget(b, 0); }
   buildCracks(cd);
 
   const logoG = new THREE.Group();
@@ -679,7 +751,7 @@ async function load() {
 }
 
 /* ---------------- loop ---------------- */
-let nextAuto = 7, lastT = 0;
+let nextAuto = 7, lastT = 0, nextDrip = 3;
 function tick() {
   const t = clock.getElapsedTime(), dt = Math.min(.05, Math.max(.001, t - lastT)); lastT = t;
   // camera: gentle drift plus whatever the visitor dragged
@@ -698,9 +770,11 @@ function tick() {
     const fe = t - (flash.userData.t ?? -9); flash.material.opacity = Math.max(0, 1 - fe * 1.6); flash.scale.setScalar(.12 + fe * .9);
     if (!reduce && t - lastInput > 9 && t > nextAuto) { nextAuto = t + 8; const a = Math.random() * 6.28, d = Math.random() * .12; burst(.47 + Math.cos(a) * d, .44 + Math.sin(a) * d * .7, true); }
   }
-  shaftMat.uniforms.uT.value = t; dust.uniforms.uT.value = t;
+  shaftMat.uniforms.uT.value = t; dust.uniforms.uT.value = t; mirror.material.uniforms.uT.value = t;
+  if (!reduce && t > nextDrip) { nextDrip = t + 2.2 + Math.random() * 3; const o = Math.random() < .5 ? L.logo : L.date; if (o) ripple(o.position.x + (Math.random() - .5) * .8, o.position.z + .05, .45); }
   for (const l of leaks) l.offset.x = t * .004;
   renderer.render(scene, camera);
+  if (BGL) { BGL.resize(); BGL.simulate(dt); BGL.draw(); }
   requestAnimationFrame(tick);
 }
 layout();
